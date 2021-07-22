@@ -2,13 +2,14 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:registro_usuarios/features/registration/data/models/user_model.dart';
+import 'package:registro_usuarios/features/registration/error/exceptions.dart';
 
 abstract class RegistrationRemoteDataSource{
   Future<void> register(UserModel user);
 }
 
 class RegistrationRemoteDataSourceImpl implements RegistrationRemoteDataSource{
-  static const API_URL = 'https://plm.com.co/test/userss';
+  static const API_URL = 'https://plm.com.co/test/users';
 
   @override
   Future<void> register(UserModel user)async{
@@ -18,13 +19,26 @@ class RegistrationRemoteDataSourceImpl implements RegistrationRemoteDataSource{
       'field_name':'photo',
       'file':user.photo
     };
-    return await _generateMultiPartRequest(API_URL, headers, fields, fileInfo);
+    http.MultipartRequest multiPRequest = await _generateMultiPartRequest(API_URL, headers, fields, fileInfo);
+    await _sendMultiPartRequest(multiPRequest);
   }
 
   Future<http.MultipartRequest> _generateMultiPartRequest(String requestUrl, Map<String, String> headers, Map<String, String> fields, Map<String, dynamic> fileInfo)async{
     final http.MultipartRequest request = _generateBasicMultiPartRequest(requestUrl, headers, fields);
     _addFileToMultiPartRequest(fileInfo, request);
     return request;
+  }
+
+  Future<http.Response> _sendMultiPartRequest(http.MultipartRequest request)async{
+    try{
+      final streamResponse = await request.send();
+      final response = await http.Response.fromStream(streamResponse);
+      if(response.statusCode != 200)
+        throw Exception();
+      return response;
+    }on Exception{
+      throw ServerException();
+    }
   }
 
   http.MultipartRequest _generateBasicMultiPartRequest(String requestUrl, Map<String, String> headers, Map<String, String> fields){

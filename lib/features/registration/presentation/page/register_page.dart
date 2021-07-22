@@ -1,7 +1,10 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:registro_usuarios/features/registration/presentation/bloc/registration_bloc.dart';
+import '../../../../dependencies_injection.dart';
+
 // ignore: must_be_immutable
 class RegisterPage extends StatefulWidget {
   final ImagePicker picker = ImagePicker();
@@ -26,30 +29,102 @@ class RegisterPage extends StatefulWidget {
 class _RegisterPageState extends State<RegisterPage> {
   DateTime birthDate;
   File photo;
+  RegistrationState blocState;
   BuildContext context;
 
   @override
   Widget build(BuildContext context) {
-    this.context = context;
     return Scaffold(
-      body: SafeArea(
-        child: Container(
-          height: MediaQuery.of(context).size.height * 0.75,
-          padding: EdgeInsets.symmetric(horizontal: MediaQuery.of(context).size.width * 0.125),
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _createGeneralInput(widget.nameController, TextInputType.name, Icons.person, 'Nombre'),
-                _createGeneralInput(widget.nameController, TextInputType.name, Icons.person, 'Apellido'),
-                _createGeneralInput(widget.nameController, TextInputType.number, Icons.card_giftcard, 'Documento identidad'),
-                _createGeneralInput(widget.nameController, TextInputType.emailAddress, Icons.email, 'Email'),
-                _createGeneralInput(widget.nameController, TextInputType.phone, Icons.phone, 'Número telefónico'),
-                _createPickImageButton()
-              ],
+      body: BlocProvider<RegistrationBloc>(
+        create: (_)=>sl(),
+        child: SafeArea(
+          child: Container(
+            height: MediaQuery.of(context).size.height * 0.925,
+            padding: EdgeInsets.symmetric(horizontal: MediaQuery.of(context).size.width * 0.125),
+            child: Center(
+              child: BlocBuilder<RegistrationBloc, RegistrationState>(
+                builder: (blocContext, state){
+                  this.context = blocContext;
+                  this.blocState = state;
+                  if(state is OnSuccessfulyRegistrated)
+                    return _createSuccessfulyRegistratedText();
+                  else if(state is OnRegistrationError){
+                    _resetForm();
+                    return _createMessageWidget(state.message, Colors.redAccent, Colors.white);
+                  }
+                  else
+                    return _createFormComponents();
+                },
+              ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _createSuccessfulyRegistratedText(){
+    return _createMessageWidget(
+      'El usuario ha sido registrado',
+      Colors.greenAccent,
+      Colors.black
+    );
+  }
+
+  void _resetForm(){
+    widget.nameController.text = null;
+    widget.lastNameController.text = null;
+    widget.docNumberController.text = null;
+    widget.emailController.text = null;
+    widget.phoneController.text = null;
+    this.photo = null;
+    birthDate = null;
+  }
+
+  Widget _createMessageWidget(String message, Color backgroundColor, Color textColor){
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: 35,
+        vertical: 30
+      ),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(25)
+      ),
+      child: Text(
+        message,
+        style: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: textColor
+        ),
+      ),
+    );
+  }
+
+  Widget _createFormComponents(){
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
+      children: [
+        _createTitle(),
+        _createGeneralInput(widget.nameController, TextInputType.name, Icons.person, 'Nombre'),
+        _createGeneralInput(widget.lastNameController, TextInputType.name, Icons.person, 'Apellido'),
+        _createGeneralInput(widget.docNumberController, TextInputType.number, Icons.card_giftcard, 'Documento identidad'),
+        _createGeneralInput(widget.emailController, TextInputType.emailAddress, Icons.email, 'Email'),
+        _createGeneralInput(widget.phoneController, TextInputType.phone, Icons.phone, 'Número telefónico'),
+        _createPickImageButton(),
+        _createDateButton(),
+        _createSendButton()
+      ],
+    );
+  }
+
+  Widget _createTitle(){
+    return Text(
+      'Registrarse',
+      style: TextStyle(
+        fontSize: 25,
+        fontWeight: FontWeight.bold
       ),
     );
   }
@@ -104,11 +179,18 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Widget _createPickImageButton(){
+    if(this.photo == null)
+      return _createButton('Adjuntar imágen', _pickImg);
+    else
+      return _createInformationText('Imágen adjuntada');
+  }
+
+  Widget _createButton(String text, Function onPressed){
     return MaterialButton(
       color: Colors.blueAccent,
       shape: _createBtnShape(),
-      child: _createButtonText('Adjuntar foto'),    
-      onPressed: _pickImg
+      child: _createButtonText(text),    
+      onPressed: onPressed
     );
   }
 
@@ -136,10 +218,58 @@ class _RegisterPageState extends State<RegisterPage> {
   Future<void> _pickImg()async{
     try{
       this.photo = await ImagePicker.pickImage(source: ImageSource.gallery);
+      setState(() {
+      });
     }catch(_){
 
     }
-
   }
-  
+
+  Widget _createInformationText(String text){
+     return Text(
+      text,
+      style: TextStyle(
+        fontSize: 17.5
+      ),
+    );
+  }
+
+  Widget _createDateButton(){
+    if(this.birthDate == null)
+      return _createButton('Adjuntar fecha de nacimiento', _pickBirthDate);
+    else
+      return _createInformationText(
+        'Fecha de nacimiento: ${this.birthDate.year}-${this.birthDate.month}-${this.birthDate.day}'
+      );
+  }
+
+  Future<void> _pickBirthDate()async{
+    this.birthDate = await showDatePicker(
+      context: context, 
+      initialDate: DateTime.now(), 
+      firstDate: DateTime(1900), 
+      lastDate: DateTime(2050)
+    );
+    setState(() {
+    });
+  }
+
+  Widget _createSendButton(){
+    if(blocState is OnEmptyRegistration || blocState is OnSuccessfulyRegistrated)
+      return _createButton('Enviar', (){
+        BlocProvider.of<RegistrationBloc>(context).add(RegisterEvent(
+          name: widget.nameController.text, 
+          lastName: widget.lastNameController.text,
+          docNumber: int.parse( widget.docNumberController.text ), 
+          email: widget.emailController.text, 
+          phone: int.parse( widget.phoneController.text ), 
+          birthDate: this.birthDate, 
+          photo: this.photo
+        ));
+      });
+    else
+      return CircularProgressIndicator(
+        backgroundColor: Colors.blueAccent,
+      );
+  }
 }

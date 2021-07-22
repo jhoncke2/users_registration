@@ -10,6 +10,8 @@ part 'registration_event.dart';
 part 'registration_state.dart';
 
 class RegistrationBloc extends Bloc<RegistrationEvent, RegistrationState> {
+  static const SERVER_FAILURE_MESSAGE = 'Ha ocurrido un error al enviar la información al servidor';
+
   final Register register;
   RegistrationBloc({
     @required this.register
@@ -30,8 +32,19 @@ class RegistrationBloc extends Bloc<RegistrationEvent, RegistrationState> {
         birthDate: event.birthDate,
         photo: event.photo
       );
-      await register(RegisterParams(user: user));
-      yield OnSuccessfulyRegistrated();
+      final eitherRegister = await register(RegisterParams(user: user));
+      yield * eitherRegister.fold((failure)async*{
+        yield OnRegistrationError(message: SERVER_FAILURE_MESSAGE);
+        yield * _yieldOnEmptyRegistration();
+      }, (_)async*{
+        yield OnSuccessfulyRegistrated();
+        yield * _yieldOnEmptyRegistration();
+      });
+      
     }
+  }
+
+  Stream<RegistrationState> _yieldOnEmptyRegistration()async*{
+    yield await Future.delayed(Duration(milliseconds: 2000), ()=> OnEmptyRegistration());
   }
 }
