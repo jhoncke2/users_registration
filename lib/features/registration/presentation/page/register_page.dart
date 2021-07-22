@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:registro_usuarios/features/registration/presentation/bloc/registration_bloc.dart';
+import 'package:registro_usuarios/features/registration/presentation/widgets/registration_form.dart';
 import '../../../../dependencies_injection.dart';
 
 // ignore: must_be_immutable
 class RegisterPage extends StatefulWidget {
+  static const ROUTE = 'register';
   final ImagePicker picker = ImagePicker();
   TextEditingController nameController;
   TextEditingController lastNameController;
@@ -53,7 +55,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     return _createMessageWidget(state.message, Colors.redAccent, Colors.white);
                   }
                   else
-                    return _createFormComponents();
+                    return RegistrationForm();
                 },
               ),
             ),
